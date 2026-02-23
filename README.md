@@ -1,7 +1,5 @@
 # MIBRI
 
-Mock Interview Before Real Interview
-
 Mobile App
 
 React Native (Expo)
