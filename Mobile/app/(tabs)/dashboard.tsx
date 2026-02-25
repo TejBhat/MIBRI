@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text,StyleSheet } from "react-native";
 
 
 export default function DashBoard(){
@@ -8,3 +8,7 @@ export default function DashBoard(){
         </View>
     );
 }
+
+const style=StyleSheet.create({
+
+})
