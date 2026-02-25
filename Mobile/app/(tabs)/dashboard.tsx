@@ -1,11 +1,13 @@
-import { View, Text,StyleSheet } from "react-native";
+import { View, Text,StyleSheet, ImageBackground } from "react-native";
 
 
 export default function DashBoard(){
     return(
-        <View>
-            <Text>Hello</Text>
-        </View>
+       <ImageBackground 
+       source={require("")}
+       resizeMode="cover">
+
+       </ImageBackground>
     );
 }
 
