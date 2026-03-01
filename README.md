@@ -14,7 +14,7 @@ react-native-voice
 
 axios
 
-Backend
+# Backend
 
 Node.js
 
@@ -34,7 +34,7 @@ cors
 
 @supabase/supabase-js
 
-Database
+# Database
 
 Supabase (PostgreSQL + pgvector)
 
