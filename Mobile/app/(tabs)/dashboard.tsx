@@ -1,6 +1,5 @@
 import {Text,StyleSheet, ImageBackground} from "react-native";
 import {Button} from "react-native-paper"
-import { router } from "expo-router";
 
 export default function DashBoard(){
     return(
@@ -11,7 +10,7 @@ export default function DashBoard(){
        <Text style={style.title}>MIBRI</Text>
        <Button mode="contained" style={style.button} 
                 contentStyle={style.buttontext} 
-                labelStyle={style.buttonLabel} onPress={()=>router.push("")}>Upload Resume</Button>
+                labelStyle={style.buttonLabel}>Upload Resume</Button>
        </ImageBackground>
     );
 }
@@ -19,15 +18,15 @@ export default function DashBoard(){
 const style=StyleSheet.create({
        title:{
         position:"absolute",
-        top:100,
+        top:60,
         fontWeight:"bold",
-        fontSize:40,
+        fontSize:60,
         color:"#ffff00",
        },
 
        button:{
         borderRadius:30,
-        width:250,  
+        width:215,  
         backgroundColor:"#ffff00",
        },
 
@@ -39,7 +38,7 @@ const style=StyleSheet.create({
        buttonLabel:{
           fontWeight:"bold",
           fontSize:20,
-        color:"#ffffff",
+          color:"black",
        },
 
         wholescreen:{
