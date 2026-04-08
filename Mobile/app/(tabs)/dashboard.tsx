@@ -1,49 +1,100 @@
-import {Text,StyleSheet, ImageBackground} from "react-native";
-import {Button} from "react-native-paper"
+import { router } from "expo-router";
+import { Text, StyleSheet, ImageBackground, View } from "react-native";
+import { Button } from "react-native-paper";
 
-export default function DashBoard(){
-    return(
-       <ImageBackground 
-       source={require("../../assets/images/mibribackground.jpg")}
-       style={style.wholescreen}
-       resizeMode="cover">
-       <Text style={style.title}>MIBRI</Text>
-       <Button mode="contained" style={style.button} 
-                contentStyle={style.buttontext} 
-                labelStyle={style.buttonLabel}>Upload Resume</Button>
-       </ImageBackground>
-    );
+export default function DashBoard() {
+  return (
+    <ImageBackground
+      source={require("../../assets/images/mibribackground.jpg")}
+      style={styles.wholescreen}
+      resizeMode="cover"
+    >
+      {/* Dark overlay for better text contrast */}
+      <View style={styles.overlay} />
+
+      {/* Content Container */}
+      <View style={styles.contentContainer}>
+        <Text style={styles.title}>MIBRI</Text>
+        <Text style={styles.subtitle}>Mock Interview Before Real Interview</Text>
+
+        <Button
+          mode="contained"
+          style={styles.button}
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+          onPress={() =>router.push("/(tabs)/upload") }
+            // Navigate to resume upload
+        >
+          📄 Upload Resume
+        </Button>
+
+        <Text style={styles.description}>
+          Start your mock interview journey today
+        </Text>
+      </View>
+    </ImageBackground>
+  );
 }
 
-const style=StyleSheet.create({
-       title:{
-        position:"absolute",
-        top:60,
-        fontWeight:"bold",
-        fontSize:60,
-        color:"#ffff00",
-       },
+const styles = StyleSheet.create({
+  wholescreen: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-       button:{
-        borderRadius:30,
-        width:215,  
-        backgroundColor:"#ffff00",
-       },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
 
-       buttontext:{
-        height:60,
-        justifyContent:"center",
-       },
+  contentContainer: {
+    alignItems: "center",
+    zIndex: 1,
+  },
 
-       buttonLabel:{
-          fontWeight:"bold",
-          fontSize:20,
-          color:"black",
-       },
+  title: {
+    fontWeight: "900",
+    fontSize: 72,
+    color: "#FFD700",
+    letterSpacing: 2,
+    marginBottom: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 3,
+  },
 
-        wholescreen:{
-        flex:1,
-        justifyContent:"center",
-        alignItems:"center",
-    },
-})
+  subtitle: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    marginBottom: 48,
+    letterSpacing: 0.5,
+    fontWeight: "500",
+  },
+
+  button: {
+    borderRadius: 50,
+    width: 240,
+    backgroundColor: "#FFD700",
+    elevation: 8,
+    marginBottom: 32,
+  },
+
+  buttonContent: {
+    height: 56,
+    justifyContent: "center",
+  },
+
+  buttonLabel: {
+    fontWeight: "700",
+    fontSize: 18,
+    color: "#000000",
+    letterSpacing: 0.5,
+  },
+
+  description: {
+    fontSize: 13,
+    color: "#ffffff",
+    letterSpacing: 0.3,
+  },
+});
