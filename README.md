@@ -1,3 +1,8 @@
+<p align="center">
+     <img src="Mobile/assets/images/icon.png" width="240" alt="icon"/>
+</p>
+
+
 # MIBRI
 
 Mobile App
