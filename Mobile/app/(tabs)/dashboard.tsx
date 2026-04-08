@@ -15,7 +15,10 @@ export default function DashBoard() {
       {/* Content Container */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>MIBRI</Text>
-        <Text style={styles.subtitle}>Mock Interview Before Real Interview</Text>
+       <Text style={styles.subtitle}>
+  <Text style={styles.highlight}>M</Text>ock <Text style={styles.highlight}>I</Text>nterview 
+    <Text style={styles.highlight}> B</Text>efore <Text style={styles.highlight}>R</Text>eal <Text style={styles.highlight}>I</Text>nterview
+</Text>
 
         <Button
           mode="contained"
@@ -42,6 +45,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  highlight: {
+  color: "#FFD700",
+  fontSize: 15,
+  fontWeight: "700",
+},
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
