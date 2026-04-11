@@ -48,3 +48,10 @@ Upload your resume → Get personalized questions → Practice confidently.
 - Postman (API testing)
 - Docker
 
+---
+
+## App Screenshots
+
+<p align="center">
+  <img src="/Mobile/screenshots/firstScreen.jpg" width="250" alt="firstScreen" />
+</p>
