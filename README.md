@@ -1,57 +1,50 @@
 <p align="center">
-     <img src="Mobile/assets/images/icon.png" width="240" alt="icon"/>
+  <img src="Mobile/assets/images/icon.png" width="240" alt="MIBRI Logo"/>
 </p>
 
+---
 
-# MIBRI
+**MIBRI** is a mobile application that helps users prepare for interviews by generating **AI-powered mock interview questions** based on their resume.
 
-Mobile App
+Upload your resume → Get personalized questions → Practice confidently.
 
-React Native (Expo)
+---
 
-TypeScript
+## ✨ Features
 
-expo-document-picker
+- Upload Resume (PDF)
+- AI-generated interview questions
+- Multiple interview durations
+- Voice-based interaction (planned)
 
-expo-speech
+---
 
-react-native-voice
+## 📱 Tech Stack
 
-axios
+### Mobile App
+- React Native (Expo)
+- TypeScript
+- expo-document-picker
+- expo-speech
+- react-native-voice
+- axios
 
-# Backend
+### Backend
+- Node.js
+- Express.js
+- JavaScript
+- multer (file uploads)
+- pdf-parse (resume parsing)
+- dotenv
+- cors
 
-Node.js
+### Database & Storage
+- Supabase (PostgreSQL + Storage)
 
-Express.js
+### AI Integration
+- Mistral (via Hugging Face Inference API)
 
-JavaScript
-
-pdf-parse
-
-multer
-
-dotenv
-
-cors
-
-@google/generative-ai
-
-@supabase/supabase-js
-
-# Database
-
-Supabase (PostgreSQL + pgvector)
-
-AI
-
-Google Gemini (Free Tier)
-
-API Testing
-
-Postman
-
-Deployment / DevOps
-
-Docker
+### Tools
+- Postman (API testing)
+- Docker
 
