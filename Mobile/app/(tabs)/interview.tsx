@@ -1,458 +1,458 @@
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
   Text,
-  TouchableOpacity,
   ImageBackground,
+  TouchableOpacity,
+  Alert,
   ScrollView,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Button } from "react-native-paper";
+import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
+import { apiService } from "../services/api";
+import { storageService } from "../services/storage";
+import type { Interview, InterviewQuestion, User, Resume } from "../types";
 
-// Define your navigation stack types
-type RootStackParamList = {
-  interview: { duration: string };
-  // Add other screens here
-};
+const { width, height } = Dimensions.get("window");
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+export default function InterviewScreen() {
+  const router = useRouter();
+  const [step, setStep] = useState<"setup" | "questions" | "interview">("setup");
+  const [duration, setDuration] = useState<"5min" | "10min" | "15min">("10min");
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [interview, setInterview] = useState<Interview | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<string[]>([]);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  
+  // ✅ FIX: Use NodeJS.Timeout | number | null for React Native
+  const timerRef = useRef<NodeJS.Timeout | number | null>(null);
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [resume, setResume] = useState<Resume | null>(null);
 
-interface DurationOption {
-  id: string;
-  minutes: number;
-  questions: string;
-  description: string;
-  icon: string;
-  color: string;
-  gradient: [string, string];
-  badge?: string;
-}
+  useEffect(() => {
+    const loadData = async () => {
+      const savedUser = await storageService.getUser();
+      const savedResume = await storageService.getResume();
+      setUser(savedUser);
+      setResume(savedResume);
+    };
+    loadData();
+  }, []);
 
-const DURATIONS: DurationOption[] = [
-  {
-    id: "5min",
-    minutes: 5,
-    questions: "5-6",
-    description: "Quick practice run",
-    icon: "⚡",
-    color: "#FF6B35",
-    gradient: ["rgba(255, 107, 53, 0.4)", "rgba(255, 107, 53, 0.1)"],
-  },
-  {
-    id: "10min",
-    minutes: 10,
-    questions: "8-10",
-    description: "Standard session",
-    icon: "🎯",
-    color: "#FFD700",
-    gradient: ["rgba(255, 215, 0, 0.4)", "rgba(255, 215, 0, 0.1)"],
-    badge: "Most Popular",
-  },
-  {
-    id: "15min",
-    minutes: 15,
-    questions: "12-15",
-    description: "Full interview prep",
-    icon: "🏆",
-    color: "#00D4FF",
-    gradient: ["rgba(0, 212, 255, 0.4)", "rgba(0, 212, 255, 0.1)"],
-  },
-];
+  // Timer logic with correct cleanup
+  useEffect(() => {
+    if (step === "interview" && interview) {
+      const totalSeconds = interview.duration_minutes * 60;
+      timerRef.current = setInterval(() => {
+        setTimerSeconds((prev) => {
+          if (prev >= totalSeconds) {
+            handleEndInterview();
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1000);
 
-export default function Interview() {
-  const navigation = useNavigation<NavigationProp>();
-  const [selected, setSelected] = useState<string | null>(null);
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current as NodeJS.Timeout);
+        }
+      };
+    }
+  }, [step, interview]);
 
-  const startInterview = () => {
-    if (selected) {
-      const duration = DURATIONS.find((d) => d.id === selected);
-      console.log("Starting interview with duration:", duration?.minutes, "min");
-      // Navigate to interview screen
-      navigation.navigate("interview", { duration: selected });
+  // ... rest of your interview screen code remains the same
+  
+  const startInterview = async () => {
+    if (!user) {
+      Alert.alert("Error", "User data not found. Please upload resume first.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const newInterview = await apiService.startInterview(user.email, duration);
+
+      setInterview(newInterview);
+      setUserAnswers(new Array(newInterview.questions.length).fill(""));
+      setTimerSeconds(0);
+      setCurrentQuestion(0);
+      setStep("interview");
+
+      await storageService.saveCurrentInterview(newInterview);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to start interview";
+      Alert.alert("Error", errorMessage);
+      console.error("Start interview error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const goBack = () => {
-    navigation.goBack();
+  const handleAnswerChange = (text: string) => {
+    const newAnswers = [...userAnswers];
+    newAnswers[currentQuestion] = text;
+    setUserAnswers(newAnswers);
   };
 
-  return (
-    <ImageBackground
-      source={require("../../assets/images/mibribackground.jpg")}
-      style={styles.container}
-      resizeMode="cover"
-    >
-      {/* Dark overlay */}
-      <View style={styles.overlay} />
+  const goToNextQuestion = () => {
+    if (interview && currentQuestion < interview.questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    }
+  };
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+  const goToPreviousQuestion = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    }
+  };
+
+  const handleEndInterview = async () => {
+    if (!interview) return;
+
+    Alert.alert(
+      "End Interview",
+      "Are you sure you want to end the interview?",
+      [
+        { text: "Cancel", onPress: () => {} },
+        {
+          text: "End",
+          onPress: async () => {
+            await submitInterview();
+          },
+        },
+      ]
+    );
+  };
+
+  const submitInterview = async () => {
+    if (!interview || !user || !resume) {
+      Alert.alert("Error", "Missing interview data");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      await apiService.submitAnswers(interview.id, userAnswers);
+
+      const evaluation = await apiService.submitForEvaluation(
+        user.email,
+        interview.id,
+        resume.resume_text,
+        interview.questions,
+        userAnswers
+      );
+
+      router.push({
+        pathname: "/(tabs)/result",
+        params: {
+          evaluationId: evaluation.id,
+          interviewId: interview.id,
+        },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to submit interview";
+      Alert.alert("Error", errorMessage);
+      console.error("Submit interview error:", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Setup step
+  if (step === "setup") {
+    return (
+      <ImageBackground
+        source={require("../../assets/images/mibribackground.jpg")}
+        style={styles.container}
+        resizeMode="cover"
       >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.stepBadge}>Step 2 of 4</Text>
-          <Text style={styles.title}>Choose Interview Duration</Text>
-          <Text style={styles.subtitle}>
-            Select how long you want to practice
-          </Text>
-        </View>
+        <View style={styles.overlay} />
 
-        {/* Cards Container */}
-        <View style={styles.cardsContainer}>
-          {DURATIONS.map((duration) => (
-            <TouchableOpacity
-              key={duration.id}
-              onPress={() => setSelected(duration.id)}
-              activeOpacity={0.7}
-              style={styles.cardWrapper}
-            >
-              {duration.badge && selected === duration.id && (
-                <View style={styles.badgeContainer}>
-                  <Text style={styles.badge}>{duration.badge}</Text>
-                </View>
-              )}
+        <ScrollView contentContainerStyle={styles.setupContent}>
+          <Text style={styles.setupTitle}>Choose Interview Duration</Text>
 
-              <LinearGradient
-                colors={
-                  selected === duration.id
-                    ? [
-                        `rgba(${
-                          duration.id === "5min"
-                            ? "255, 107, 53"
-                            : duration.id === "10min"
-                              ? "255, 215, 0"
-                              : "0, 212, 255"
-                        }, 0.5)`,
-                        `rgba(${
-                          duration.id === "5min"
-                            ? "255, 107, 53"
-                            : duration.id === "10min"
-                              ? "255, 215, 0"
-                              : "0, 212, 255"
-                        }, 0.15)`,
-                      ]
-                    : duration.gradient
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+          <View style={styles.durationCards}>
+            {(["5min", "10min", "15min"] as const).map((dur) => (
+              <TouchableOpacity
+                key={dur}
+                onPress={() => setDuration(dur)}
                 style={[
-                  styles.card,
-                  selected === duration.id && styles.cardSelected,
+                  styles.durationCard,
+                  duration === dur && styles.durationCardSelected,
                 ]}
               >
-                {/* Left Icon Section */}
-                <View style={styles.iconSection}>
-                  <Text style={styles.icon}>{duration.icon}</Text>
-                </View>
-
-                {/* Middle Content Section */}
-                <View style={styles.contentSection}>
-                  <Text style={[styles.durationTime, { color: duration.color }]}>
-                    {duration.minutes} min
-                  </Text>
-                  <Text style={styles.questionsCount}>
-                    ~{duration.questions} questions
-                  </Text>
-                  <Text style={styles.description}>
-                    {duration.description}
-                  </Text>
-                </View>
-
-                {/* Right Checkmark */}
-                <View style={styles.checkmarkSection}>
-                  {selected === duration.id && (
-                    <View
-                      style={[
-                        styles.checkmark,
-                        {
-                          backgroundColor: duration.color,
-                          shadowColor: duration.color,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.checkmarkText}>✓</Text>
-                    </View>
-                  )}
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Features Info Box */}
-        <View style={styles.featuresBox}>
-          <Text style={styles.featuresTitle}>📋 What's Included:</Text>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>🎤</Text>
-            <Text style={styles.featureText}>AI-generated interview questions</Text>
+                <Text style={styles.durationText}>
+                  {dur === "5min" ? "5" : dur === "10min" ? "10" : "15"}
+                </Text>
+                <Text style={styles.durationLabel}>minutes</Text>
+                <Text style={styles.durationQuestions}>
+                  {dur === "5min" ? "5-6" : dur === "10min" ? "8-10" : "12-15"} Q
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>🎯</Text>
-            <Text style={styles.featureText}>Real-time speech recognition</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>📊</Text>
-            <Text style={styles.featureText}>
-              Detailed feedback & improvement plan
+
+          <View style={styles.setupInfo}>
+            <Text style={styles.setupInfoText}>
+              💡 You can pause and resume anytime. Your answers are saved automatically.
             </Text>
           </View>
+        </ScrollView>
+
+        <View style={styles.setupButtonContainer}>
+          <Button
+            mode="contained"
+            onPress={startInterview}
+            loading={loading}
+            disabled={loading}
+            style={styles.startButton}
+            contentStyle={{ height: 56 }}
+            labelStyle={styles.startButtonLabel}
+          >
+            {loading ? "Starting..." : "Start Interview"}
+          </Button>
+          <Button
+            mode="text"
+            onPress={() => router.back()}
+            style={styles.backButton}
+            labelStyle={styles.backButtonLabel}
+          >
+            Back
+          </Button>
+        </View>
+      </ImageBackground>
+    );
+  }
+
+  // Interview step
+  if (step === "interview" && interview) {
+    const question = interview.questions[currentQuestion];
+    const progress = ((currentQuestion + 1) / interview.questions.length) * 100;
+    const remainingSeconds = interview.duration_minutes * 60 - timerSeconds;
+
+    return (
+      <ImageBackground
+        source={require("../../assets/images/mibribackground.jpg")}
+        style={styles.container}
+        resizeMode="cover"
+      >
+        <View style={styles.overlay} />
+
+        <View style={styles.interviewHeader}>
+          <View style={styles.timerBox}>
+            <Ionicons name="timer" size={20} color="#FFD700" />
+            <Text
+              style={[
+                styles.timerText,
+                remainingSeconds < 60 && styles.timerWarning,
+              ]}
+            >
+              {formatTimer(timerSeconds)}
+            </Text>
+          </View>
+
+          <View style={styles.progressBox}>
+            <Text style={styles.progressText}>
+              {currentQuestion + 1} / {interview.questions.length}
+            </Text>
+            <View style={styles.progressBar}>
+              <View
+                style={[styles.progressFill, { width: `${progress}%` }]}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleEndInterview}
+            style={styles.endButton}
+          >
+            <Ionicons name="close" size={24} color="#FF6B6B" />
+          </TouchableOpacity>
         </View>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            💡 Tip: Start with 5 minutes if this is your first interview!
-          </Text>
-        </View>
-      </ScrollView>
+        <ScrollView contentContainerStyle={styles.questionContent}>
+          <View style={styles.questionCard}>
+            <LinearGradient
+              colors={["rgba(255, 215, 0, 0.2)", "rgba(255, 215, 0, 0.05)"]}
+              style={styles.questionBox}
+            >
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryBadgeText}>
+                  {question.category === "technical" ? "🔧" : "🤝"}{" "}
+                  {question.category}
+                </Text>
+              </View>
 
-      {/* Bottom Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <Button
-          mode="contained"
-          disabled={!selected}
-          onPress={startInterview}
-          style={[
-            styles.startButton,
-            !selected && styles.startButtonDisabled,
-          ]}
-          contentStyle={{ height: 56 }}
-          labelStyle={styles.startButtonLabel}
-        >
-          Start Interview
-        </Button>
-        <Button
-          mode="text"
-          onPress={goBack}
-          style={styles.backButton}
-          contentStyle={{ height: 50 }}
-          labelStyle={styles.backButtonLabel}
-        >
-          Back
-        </Button>
-      </View>
-    </ImageBackground>
-  );
+              <Text style={styles.questionText}>{question.question}</Text>
+
+              <View style={styles.difficultyBar}>
+                <Text style={styles.difficultyLabel}>Difficulty:</Text>
+                <View style={styles.difficultyDots}>
+                  {[1, 2, 3].map((dot) => (
+                    <View
+                      key={dot}
+                      style={[
+                        styles.difficultyDot,
+                        {
+                          backgroundColor:
+                            (question.difficulty === "easy" && dot === 1) ||
+                            (question.difficulty === "medium" && dot <= 2) ||
+                            (question.difficulty === "hard" && dot <= 3)
+                              ? "#FFD700"
+                              : "rgba(255, 255, 255, 0.3)",
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+
+          <View style={styles.answerSection}>
+            <Text style={styles.answerLabel}>Your Answer</Text>
+            <View style={styles.answerBox}>
+              <Text style={styles.answerText}>
+                {userAnswers[currentQuestion] ||
+                  "Start typing or speaking your answer..."}
+              </Text>
+            </View>
+
+            <Text style={styles.tipsText}>
+              💡 Speak clearly and take your time. Answer should be 30-60 seconds.
+            </Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.questionNavigation}>
+          <Button
+            mode="outlined"
+            onPress={goToPreviousQuestion}
+            disabled={currentQuestion === 0}
+            style={styles.navButton}
+            labelStyle={styles.navButtonLabel}
+          >
+            ← Previous
+          </Button>
+
+          {currentQuestion === interview.questions.length - 1 ? (
+            <Button
+              mode="contained"
+              onPress={handleEndInterview}
+              loading={submitting}
+              disabled={submitting}
+              style={styles.submitButton}
+              contentStyle={{ height: 50 }}
+              labelStyle={styles.submitButtonLabel}
+            >
+              {submitting ? "Submitting..." : "Submit Interview"}
+            </Button>
+          ) : (
+            <Button
+              mode="contained"
+              onPress={goToNextQuestion}
+              style={styles.nextButton}
+              contentStyle={{ height: 50 }}
+              labelStyle={styles.nextButtonLabel}
+            >
+              Next →
+            </Button>
+          )}
+        </View>
+      </ImageBackground>
+    );
+  }
+
+  return null;
 }
 
+// Styles (same as before)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
-
-  scrollContent: {
+  setupContent: {
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingVertical: 60,
     paddingBottom: 200,
   },
-
-  header: {
-    marginBottom: 32,
-    marginTop: 8,
-  },
-
-  stepBadge: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#FFD700",
-    backgroundColor: "rgba(255, 215, 0, 0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginBottom: 12,
-    letterSpacing: 0.5,
-  },
-
-  title: {
+  setupTitle: {
     fontSize: 32,
     fontWeight: "900",
     color: "#FFD700",
-    letterSpacing: 0.5,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  durationCards: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 32,
+    gap: 12,
+  },
+  durationCard: {
+    flex: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 16,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 215, 0, 0.3)",
+  },
+  durationCardSelected: {
+    backgroundColor: "rgba(255, 215, 0, 0.2)",
+    borderColor: "#FFD700",
+  },
+  durationText: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#FFD700",
     marginBottom: 8,
   },
-
-  subtitle: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontWeight: "500",
-    letterSpacing: 0.3,
-    opacity: 0.9,
-  },
-
-  cardsContainer: {
-    marginBottom: 28,
-    gap: 16,
-  },
-
-  badgeContainer: {
-    position: "absolute",
-    top: -8,
-    right: 16,
-    zIndex: 10,
-  },
-
-  badge: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    backgroundColor: "#FFD700",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  cardWrapper: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 215, 0, 0.3)",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-  },
-
-  cardSelected: {
-    borderColor: "rgba(255, 215, 0, 0.8)",
-    backgroundColor: "rgba(255, 215, 0, 0.14)",
-    shadowColor: "#FFD700",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-
-  iconSection: {
-    marginRight: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 48,
-  },
-
-  icon: {
-    fontSize: 40,
-  },
-
-  contentSection: {
-    flex: 1,
-    justifyContent: "center",
-  },
-
-  durationTime: {
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-
-  questionsCount: {
-    fontSize: 13,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    marginBottom: 3,
-  },
-
-  description: {
+  durationLabel: {
     fontSize: 12,
-    color: "rgba(255, 255, 255, 0.75)",
-    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.7)",
+    marginBottom: 8,
   },
-
-  checkmarkSection: {
-    marginLeft: 12,
-    width: 36,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  checkmark: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-
-  checkmarkText: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-
-  featuresBox: {
-    backgroundColor: "rgba(255, 215, 0, 0.12)",
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 16,
-    borderLeftWidth: 3,
-    borderLeftColor: "#FFD700",
-  },
-
-  featuresTitle: {
-    fontSize: 14,
-    fontWeight: "700",
+  durationQuestions: {
+    fontSize: 12,
     color: "#FFD700",
-    marginBottom: 12,
+    fontWeight: "600",
   },
-
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-
-  featureIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-
-  featureText: {
-    flex: 1,
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.85)",
-    fontWeight: "500",
-  },
-
-  infoBox: {
+  setupInfo: {
     backgroundColor: "rgba(255, 215, 0, 0.15)",
     borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: "#FFD700",
+    padding: 16,
+    marginBottom: 32,
   },
-
-  infoText: {
-    fontSize: 12,
+  setupInfoText: {
+    fontSize: 13,
     color: "#FFFFFF",
     fontWeight: "500",
-    letterSpacing: 0.3,
   },
-
-  buttonContainer: {
+  setupButtonContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
@@ -460,41 +460,197 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingBottom: 28,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
     gap: 12,
   },
-
   startButton: {
     backgroundColor: "#FFD700",
     borderRadius: 12,
-    elevation: 8,
-    shadowColor: "#FFD700",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
   },
-
-  startButtonDisabled: {
-    backgroundColor: "rgba(255, 215, 0, 0.4)",
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-
   startButtonLabel: {
     fontSize: 16,
     fontWeight: "800",
     color: "#000000",
-    letterSpacing: 0.5,
   },
-
   backButton: {
     borderRadius: 12,
   },
-
   backButtonLabel: {
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
-    letterSpacing: 0.3,
+  },
+  interviewHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  timerBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 8,
+  },
+  timerText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFD700",
+  },
+  timerWarning: {
+    color: "#FF6B6B",
+  },
+  progressBox: {
+    flex: 1,
+  },
+  progressText: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#FFD700",
+  },
+  endButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  questionContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingBottom: 200,
+  },
+  questionCard: {
+    marginBottom: 24,
+  },
+  questionBox: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 215, 0, 0.3)",
+  },
+  categoryBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255, 215, 0, 0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    color: "#FFD700",
+    fontWeight: "700",
+  },
+  questionText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 16,
+    lineHeight: 26,
+  },
+  difficultyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  difficultyLabel: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.7)",
+    fontWeight: "600",
+  },
+  difficultyDots: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  difficultyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  answerSection: {
+    marginBottom: 24,
+  },
+  answerLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFD700",
+    marginBottom: 12,
+  },
+  answerBox: {
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 120,
+    justifyContent: "flex-start",
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 215, 0, 0.2)",
+  },
+  answerText: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    lineHeight: 20,
+  },
+  tipsText: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.6)",
+    fontStyle: "italic",
+  },
+  questionNavigation: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 28,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    flexDirection: "row",
+    gap: 12,
+  },
+  navButton: {
+    flex: 1,
+    borderColor: "#FFD700",
+  },
+  navButtonLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFD700",
+  },
+  nextButton: {
+    flex: 1,
+    backgroundColor: "#FFD700",
+  },
+  nextButtonLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#000000",
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: "#4CAF50",
+  },
+  submitButtonLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });
